@@ -13,29 +13,99 @@ import {
   Code2,
   Sun,
   CalendarDays,
+  Moon,
+  CloudMoon,
+  CloudFog,
+  CloudDrizzle,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  CircleHelp,
+  RefreshCw,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { fetchManilaWeather, formatManilaTime } from "./services/weather";
+import type { CurrentWeather } from "./services/weather";
+import { describeWeather } from "./services/weatherCodes";
+import type { WeatherIcon } from "./services/weatherCodes";
 import type { LucideIcon } from "lucide-react";
 
-function EmptyMetric({
+const weatherIcons: Record<WeatherIcon, LucideIcon> = {
+  sun: Sun,
+  moon: Moon,
+  "cloud-sun": CloudSun,
+  "cloud-moon": CloudMoon,
+  cloud: Cloud,
+  fog: CloudFog,
+  drizzle: CloudDrizzle,
+  rain: CloudRain,
+  snow: CloudSnow,
+  storm: CloudLightning,
+  unknown: CircleHelp,
+};
+
+function Metric({
   icon: Icon,
   label,
   detail,
+  value,
 }: {
   icon: LucideIcon;
   label: string;
   detail: string;
+  value: string;
 }) {
   return (
     <div className="metric">
       <Icon size={20} aria-hidden="true" />
       <p>{label}</p>
-      <strong>—</strong>
+      <strong
+        className={label === "Conditions" ? "condition-value" : undefined}
+      >
+        {value}
+      </strong>
       <span>{detail}</span>
     </div>
   );
 }
 
+type WeatherState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "success"; data: CurrentWeather };
+
 function App() {
+  const [state, setState] = useState<WeatherState>({ status: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchManilaWeather(controller.signal).then(
+      (data) => {
+        if (!controller.signal.aborted) setState({ status: "success", data });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Weather is unavailable. Please retry.",
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [attempt]);
+  const data = state.status === "success" ? state.data : null;
+  const condition = describeWeather(
+    data?.weatherCode ?? null,
+    data?.isDay ?? null,
+  );
+  const ConditionIcon = weatherIcons[condition.icon];
+  const reading = (value: number | null | undefined, unit: string) =>
+    value == null
+      ? "—"
+      : `${value.toLocaleString("en-PH", { maximumFractionDigits: 1 })}${unit}`;
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main">
@@ -98,31 +168,114 @@ function App() {
                 <MapPin size={18} /> Manila{" "}
                 <small>Metro Manila, Philippines</small>
               </span>
-              <span className="outline-badge">PREVIEW</span>
+              <span className="outline-badge">
+                {state.status === "success"
+                  ? "MODEL DATA"
+                  : state.status === "loading"
+                    ? "CONNECTING"
+                    : "UNAVAILABLE"}
+              </span>
             </div>
-            <div className="current-body">
-              <div>
+            <div
+              className="current-body"
+              aria-busy={state.status === "loading"}
+            >
+              <div className="current-content" role="status" aria-live="polite">
                 <p className="eyebrow" id="current-title">
                   CURRENT WEATHER
                 </p>
-                <h2>
-                  Waiting for
-                  <br />a sky update.
-                </h2>
-                <p>Weather data not connected yet</p>
-                <span className="connection">
-                  <span /> Live connection arrives in milestone 2
-                </span>
+                {state.status === "loading" ? (
+                  <>
+                    <h2>
+                      Checking
+                      <br />
+                      Manila’s sky…
+                    </h2>
+                    <p>Loading current weather from Open-Meteo.</p>
+                  </>
+                ) : state.status === "error" ? (
+                  <>
+                    <h2>
+                      A little cloudy
+                      <br />
+                      on our end.
+                    </h2>
+                    <p>{state.message}</p>
+                    <button
+                      className="retry-button"
+                      onClick={() => {
+                        setState({ status: "loading" });
+                        setAttempt((value) => value + 1);
+                      }}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" /> Retry weather
+                      request
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="live-temperature">
+                      {reading(data?.temperature, "°C")}
+                    </h2>
+                    <p className="weather-description">
+                      {condition.description}
+                    </p>
+                    <span className="connection">
+                      <span /> Model estimate · Not a station observation
+                    </span>
+                    {[
+                      data?.temperature,
+                      data?.feelsLike,
+                      data?.humidity,
+                      data?.windSpeed,
+                      data?.weatherCode,
+                      data?.isDay,
+                      data?.validAt,
+                    ].some((value) => value == null) && (
+                      <p className="missing-note">
+                        Some data is unavailable. Missing readings are shown as
+                        —.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
-              <div className="weather-art" aria-hidden="true">
-                <div className="sun-disc" />
-                <Cloud className="hero-cloud" strokeWidth={1} />
+              <div className="weather-art live-weather-art" aria-hidden="true">
+                <ConditionIcon
+                  className="current-weather-icon"
+                  strokeWidth={1.2}
+                />
               </div>
             </div>
-            <div className="current-footer">
-              <Radio size={15} />
-              <span>No weather readings have been fetched.</span>
-              <span className="temperature-unit">CELSIUS °C</span>
+            <div className="current-footer weather-timestamps">
+              <Radio size={15} aria-hidden="true" />
+              {data ? (
+                <div>
+                  <p>
+                    Model data valid at:{" "}
+                    {data.validAt === null ? (
+                      "Unavailable"
+                    ) : (
+                      <time dateTime={new Date(data.validAt).toISOString()}>
+                        {formatManilaTime(data.validAt)}
+                      </time>
+                    )}
+                  </p>
+                  <p>
+                    Fetched by this app:{" "}
+                    <time dateTime={new Date(data.fetchedAt).toISOString()}>
+                      {formatManilaTime(data.fetchedAt)}
+                    </time>
+                  </p>
+                  <span>Both times in Asia/Manila (UTC+08:00)</span>
+                </div>
+              ) : (
+                <span>
+                  {state.status === "loading"
+                    ? "Waiting for the weather service…"
+                    : "No weather data available. Use retry to try again."}
+                </span>
+              )}
             </div>
           </section>
           <aside className="favorites-card">
@@ -156,25 +309,33 @@ function App() {
               <span>Current conditions</span>
             </div>
             <div className="metrics-grid">
-              <EmptyMetric
+              <Metric
                 icon={Thermometer}
                 label="Feels like"
+                value={reading(data?.feelsLike, "°C")}
                 detail="Degrees Celsius"
               />
-              <EmptyMetric
+              <Metric
                 icon={Droplets}
                 label="Humidity"
+                value={reading(data?.humidity, "%")}
                 detail="Relative humidity · %"
               />
-              <EmptyMetric
+              <Metric
                 icon={Wind}
                 label="Wind speed"
+                value={reading(data?.windSpeed, " km/h")}
                 detail="Kilometers per hour"
               />
-              <EmptyMetric
-                icon={CloudSun}
+              <Metric
+                icon={ConditionIcon}
                 label="Conditions"
-                detail="Awaiting weather data"
+                value={data ? condition.description : "—"}
+                detail={
+                  data?.weatherCode == null
+                    ? "Weather code unavailable"
+                    : `WMO code ${data.weatherCode}`
+                }
               />
             </div>
           </section>
@@ -197,11 +358,16 @@ function App() {
                 appear here once connected.
               </p>
               <span className="forecast-note">
-                No forecast data available yet
+                Hourly and seven-day forecasts not connected yet
               </span>
             </div>
           </section>
         </div>
+        <p className="data-attribution">
+          <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a> ·{" "}
+          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> ·
+          Values rounded; weather codes converted to descriptions and icons.
+        </p>
         <section id="project" className="project-note">
           <span className="note-icon">
             <CloudSun size={21} />
@@ -209,12 +375,12 @@ function App() {
           <div>
             <h2>Good things are on the horizon.</h2>
             <p>
-              You're viewing the foundation of PanahonPH. Live weather, local
-              search, and forecasts are up next.
+              Manila’s current weather is connected. Philippine location search
+              and forecasts are up next.
             </p>
           </div>
           <span className="progress-badge">
-            01 <span>/ 07 milestones</span>
+            02 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>
@@ -225,7 +391,7 @@ function App() {
         </span>
         <div>
           <span>
-            Planned data source:{" "}
+            Weather data:{" "}
             <a href="https://open-meteo.com/">
               Open-Meteo <ArrowUpRight size={12} />
             </a>

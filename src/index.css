@@ -724,3 +724,145 @@ footer p {
     display: none;
   }
 }
+
+/* Current-weather states retain the foundation's green card and spacing. */
+.current-content {
+  min-width: 0;
+}
+.current-body .live-temperature {
+  font-size: 58px;
+  letter-spacing: -2px;
+}
+.current-body .weather-description {
+  font-size: 18px;
+}
+.current-weather-icon {
+  width: 120px;
+  height: 120px;
+  color: #e9d4a2;
+}
+.live-weather-art {
+  display: grid;
+  place-items: center;
+  width: 150px;
+}
+.retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: #e5eee8;
+  color: #184f43;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.retry-button:hover {
+  background: white;
+}
+.weather-timestamps {
+  align-items: flex-start;
+  line-height: 1.8;
+}
+.weather-timestamps > svg {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.weather-timestamps span {
+  color: #c6d8cd;
+}
+.current-body .missing-note {
+  font-size: 10px;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+.metric strong {
+  font-size: 23px;
+  color: #355b48;
+  overflow-wrap: anywhere;
+}
+.metric .condition-value {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.data-attribution {
+  font-size: 10px;
+  color: #536e5e;
+  line-height: 1.8;
+  margin-top: 16px;
+}
+.data-attribution a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .current-body {
+    gap: 8px;
+  }
+  .live-weather-art {
+    width: 90px;
+    transform: none;
+  }
+  .current-weather-icon {
+    width: 85px;
+    height: 85px;
+  }
+  .connection {
+    line-height: 1.6;
+  }
+  .metric strong {
+    font-size: 20px;
+  }
+  .metric .condition-value {
+    font-size: 12px;
+  }
+  .weather-timestamps {
+    font-size: 10px;
+  }
+}
+@media (max-width: 420px) {
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .metric:nth-child(2) {
+    border: 0;
+  }
+  .metric:nth-child(3) {
+    padding-left: 0;
+  }
+  .current-body {
+    min-height: 250px;
+  }
+  .live-weather-art {
+    width: 64px;
+  }
+  .current-weather-icon {
+    width: 64px;
+    height: 64px;
+  }
+  .current-body .live-temperature {
+    font-size: 48px;
+  }
+  .location {
+    font-size: 14px;
+  }
+  .outline-badge {
+    font-size: 8px;
+  }
+}
+
+.current-card .card-top {
+  gap: 10px;
+}
+.current-card .location {
+  flex: 1;
+  min-width: 0;
+}
+.current-card .outline-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
