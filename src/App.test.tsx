@@ -3,14 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { fetchManilaWeather } from "./services/weather";
+import { fetchCurrentWeather } from "./services/weather";
 import type { CurrentWeather } from "./services/weather";
 
 vi.mock("./services/weather", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./services/weather")>()),
-  fetchManilaWeather: vi.fn(),
+  fetchCurrentWeather: vi.fn(),
 }));
-const fetchWeather = vi.mocked(fetchManilaWeather);
+const fetchWeather = vi.mocked(fetchCurrentWeather);
 const weather: CurrentWeather = {
   temperature: 30.2,
   feelsLike: 34.1,
@@ -102,7 +102,7 @@ describe("current-weather dashboard", () => {
   it("cancels requests on unmount", () => {
     fetchWeather.mockImplementation(() => new Promise(() => {}));
     const { unmount } = render(<App />);
-    const signal = fetchWeather.mock.calls[0][0];
+    const signal = fetchWeather.mock.calls[0][1];
     expect(signal?.aborted).toBe(false);
     unmount();
     expect(signal?.aborted).toBe(true);

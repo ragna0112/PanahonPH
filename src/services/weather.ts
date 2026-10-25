@@ -1,3 +1,4 @@
+import type { WeatherLocation } from "./locations";
 export interface CurrentWeather {
   temperature: number | null;
   feelsLike: number | null;
@@ -86,12 +87,13 @@ export function parseCurrentWeather(
   };
 }
 
-export async function fetchManilaWeather(
+export async function fetchCurrentWeather(
+  location: WeatherLocation,
   signal?: AbortSignal,
 ): Promise<CurrentWeather> {
   const params = new URLSearchParams({
-    latitude: "14.5995",
-    longitude: "120.9842",
+    latitude: String(location.latitude),
+    longitude: String(location.longitude),
     current: Object.keys(fields).join(","),
     temperature_unit: "celsius",
     wind_speed_unit: "kmh",

@@ -1,6 +1,7 @@
+import { MANILA } from "./locations";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  fetchManilaWeather,
+  fetchCurrentWeather,
   formatManilaTime,
   parseCurrentWeather,
 } from "./weather";
@@ -35,14 +36,30 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("Manila current-weather API", () => {
+describe("current-weather API", () => {
+  it("uses selected coordinates rather than the name or Manila coordinates", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(fixture())));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchCurrentWeather({
+      id: 2,
+      name: "San Jose",
+      latitude: 13.88,
+      longitude: 123.51,
+    });
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.searchParams.get("latitude")).toBe("13.88");
+    expect(url.searchParams.get("longitude")).toBe("123.51");
+    expect(url.searchParams.has("name")).toBe(false);
+  });
   it("requests only current fields with explicit Manila timezone and metric units", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify(fixture())));
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(Date, "now").mockReturnValueOnce(1792930000000);
-    const data = await fetchManilaWeather();
+    const data = await fetchCurrentWeather(MANILA);
     const url = new URL(fetchMock.mock.calls[0][0]);
     expect(url.origin).toBe("https://api.open-meteo.com");
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -74,7 +91,9 @@ describe("Manila current-weather API", () => {
         "fetch",
         vi.fn().mockResolvedValue(new Response("unavailable", { status })),
       );
-      await expect(fetchManilaWeather()).rejects.toThrow(`HTTP ${status}`);
+      await expect(fetchCurrentWeather(MANILA)).rejects.toThrow(
+        `HTTP ${status}`,
+      );
     },
   );
   it("gives a useful rate-limit error", async () => {
@@ -82,18 +101,22 @@ describe("Manila current-weather API", () => {
       "fetch",
       vi.fn().mockResolvedValue(new Response("", { status: 429 })),
     );
-    await expect(fetchManilaWeather()).rejects.toThrow("request limit");
+    await expect(fetchCurrentWeather(MANILA)).rejects.toThrow("request limit");
   });
   it("explains network failure", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
-    await expect(fetchManilaWeather()).rejects.toThrow("Check your connection");
+    await expect(fetchCurrentWeather(MANILA)).rejects.toThrow(
+      "Check your connection",
+    );
   });
   it("rejects malformed JSON", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not json")));
-    await expect(fetchManilaWeather()).rejects.toThrow("unreadable data");
+    await expect(fetchCurrentWeather(MANILA)).rejects.toThrow(
+      "unreadable data",
+    );
   });
   it.each([
     null,
@@ -107,7 +130,9 @@ describe("Manila current-weather API", () => {
       "fetch",
       vi.fn().mockResolvedValue(new Response(JSON.stringify(body))),
     );
-    await expect(fetchManilaWeather()).rejects.toThrow("unexpected response");
+    await expect(fetchCurrentWeather(MANILA)).rejects.toThrow(
+      "unexpected response",
+    );
   });
   it("times out a stalled request", async () => {
     const NativeSignal = AbortSignal;
@@ -119,7 +144,7 @@ describe("Manila current-weather API", () => {
       any: NativeSignal.any,
     });
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout.reason));
-    await expect(fetchManilaWeather()).rejects.toThrow("timed out");
+    await expect(fetchCurrentWeather(MANILA)).rejects.toThrow("timed out");
   });
   it("preserves cancellation for the caller", async () => {
     const controller = new AbortController();
@@ -130,10 +155,9 @@ describe("Manila current-weather API", () => {
         Promise.reject(options.signal?.reason),
       ),
     );
-    await expect(fetchManilaWeather(controller.signal)).rejects.toHaveProperty(
-      "name",
-      "AbortError",
-    );
+    await expect(
+      fetchCurrentWeather(MANILA, controller.signal),
+    ).rejects.toHaveProperty("name", "AbortError");
   });
 });
 

@@ -6,7 +6,6 @@ import {
   Wind,
   Thermometer,
   MapPin,
-  Search,
   Star,
   Clock3,
   Radio,
@@ -23,8 +22,11 @@ import {
   CircleHelp,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { fetchManilaWeather, formatManilaTime } from "./services/weather";
+import { useEffect, useRef, useState } from "react";
+import { fetchCurrentWeather, formatManilaTime } from "./services/weather";
+import LocationSearch from "./components/LocationSearch";
+import { MANILA, locationDetails } from "./services/locations";
+import type { WeatherLocation } from "./services/locations";
 import type { CurrentWeather } from "./services/weather";
 import { describeWeather } from "./services/weatherCodes";
 import type { WeatherIcon } from "./services/weatherCodes";
@@ -75,11 +77,14 @@ type WeatherState =
   | { status: "success"; data: CurrentWeather };
 
 function App() {
+  const [location, setLocation] = useState<WeatherLocation>(MANILA);
   const [state, setState] = useState<WeatherState>({ status: "loading" });
+  const weatherRequest = useRef<AbortController | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetchManilaWeather(controller.signal).then(
+    weatherRequest.current = controller;
+    fetchCurrentWeather(location, controller.signal).then(
       (data) => {
         if (!controller.signal.aborted) setState({ status: "success", data });
       },
@@ -95,7 +100,7 @@ function App() {
       },
     );
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, location]);
   const data = state.status === "success" ? state.data : null;
   const condition = describeWeather(
     data?.weatherCode ?? null,
@@ -148,15 +153,19 @@ function App() {
           </div>
         </div>
         <div className="search-row">
-          <div className="search-box">
-            <Search size={20} aria-hidden="true" />
-            <input
-              aria-label="Search Philippine locations (available in milestone 3)"
-              placeholder="Search a Philippine city or municipality"
-              disabled
-            />
-            <kbd>Coming soon</kbd>
-          </div>
+          <LocationSearch
+            onSelect={(place) => {
+              if (
+                place.id === location.id &&
+                place.latitude === location.latitude &&
+                place.longitude === location.longitude
+              )
+                return;
+              weatherRequest.current?.abort();
+              setState({ status: "loading" });
+              setLocation(place);
+            }}
+          />
           <span className="unit">
             °C <span>/</span> Metric units
           </span>
@@ -165,8 +174,8 @@ function App() {
           <section className="current-card" aria-labelledby="current-title">
             <div className="card-top">
               <span className="location">
-                <MapPin size={18} /> Manila{" "}
-                <small>Metro Manila, Philippines</small>
+                <MapPin size={18} /> {location.name}{" "}
+                <small>{locationDetails(location)}</small>
               </span>
               <span className="outline-badge">
                 {state.status === "success"
@@ -189,7 +198,7 @@ function App() {
                     <h2>
                       Checking
                       <br />
-                      Manila’s sky…
+                      {location.name}’s sky…
                     </h2>
                     <p>Loading current weather from Open-Meteo.</p>
                   </>
@@ -367,6 +376,8 @@ function App() {
           <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a> ·{" "}
           <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> ·
           Values rounded; weather codes converted to descriptions and icons.
+          Location data via Open-Meteo /{" "}
+          <a href="https://www.geonames.org/">GeoNames</a>.
         </p>
         <section id="project" className="project-note">
           <span className="note-icon">
@@ -375,12 +386,12 @@ function App() {
           <div>
             <h2>Good things are on the horizon.</h2>
             <p>
-              Manila’s current weather is connected. Philippine location search
-              and forecasts are up next.
+              Philippine location search is connected. Choose a place to see its
+              current weather. Forecasts and favorites are up next.
             </p>
           </div>
           <span className="progress-badge">
-            02 <span>/ 07 milestones</span>
+            03 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>

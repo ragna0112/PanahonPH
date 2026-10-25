@@ -4,11 +4,11 @@ A student portfolio project built one milestone at a time: readable, responsive 
 
 ## Current progress
 
-Milestones 1 and 2 are complete. The dashboard fetches current modeled weather for Manila: temperature, feels-like temperature, relative humidity, wind speed, and understandable conditions with day/night icons. Loading, missing readings, service failures, and retry are handled. Search and saved-location controls remain disabled for their future milestones. Hourly and seven-day forecasts are explicitly not connected until milestone 4.
+Milestones 1–3 are complete. Manila is the initial location, and Philippine location search lets you choose other places. The dashboard fetches current modeled weather for the selected location: temperature, feels-like temperature, relative humidity, wind speed, and understandable conditions with day/night icons. Loading, missing readings, service failures, and retry are handled. Saved locations remain disabled until milestone 5. Hourly and seven-day forecasts are explicitly not connected until milestone 4.
 
 - [x] 1 — Project foundation and responsive dashboard shell
 - [x] 2 — Live current weather for Manila
-- [ ] 3 — Philippine city and municipality search
+- [x] 3 — Philippine city and municipality search
 - [ ] 4 — Hourly charts and seven-day forecasts
 - [ ] 5 — Favorites and refresh behavior
 - [ ] 6 — Interface polish and accessibility
@@ -40,18 +40,21 @@ No API keys or environment variables are needed. Do not commit secrets or local 
 
 - `src/main.tsx` mounts React and loads the shared stylesheet.
 - `src/App.tsx` contains the dashboard sections and a reusable `Metric` component. Each metric receives its icon, label, formatted reading, and unit description as props.
-- `src/services/weather.ts` requests and validates current weather, then returns a typed object with separate model-valid and fetch timestamps.
+- `src/components/LocationSearch.tsx` owns the accessible search dropdown, 300 ms debounce, cancellation, keyboard selection, and search retry.
+- `src/services/geocoding.ts` validates Philippine search results from Open-Meteo.
+- `src/services/locations.ts` defines typed places, the initial Manila location, and province/region labels.
+- `src/services/weather.ts` requests and validates current weather for supplied coordinates, then returns a typed object with separate model-valid and fetch timestamps.
 - `src/services/weatherCodes.ts` maps documented WMO codes to descriptions and icon names, with an unavailable fallback.
 - `src/index.css` loads Tailwind CSS and defines the visual design and responsive breakpoints.
 - `vite.config.ts` enables React and the official Tailwind Vite plugin.
 
 React renders the interface, TypeScript checks data and component contracts, and Vite runs the development server and builds the site. Tailwind CSS 4 is installed through its Vite integration. Recharts is installed with compatible React peer dependencies for milestone 4; it is not rendered or bundled into the dashboard yet. Lucide provides decorative interface icons.
 
-When `App` mounts, its React effect calls `fetchManilaWeather`. The service requests Manila coordinates (14.5995, 120.9842) from Open-Meteo's `/v1/forecast` endpoint with only `current` fields: `temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `wind_speed_10m`, `weather_code`, and `is_day`. It explicitly requests Celsius, km/h, Asia/Manila, and Unix timestamps. Open-Meteo may return a nearby model grid cell instead of the exact requested point.
+When `App` mounts, its React effect calls `fetchCurrentWeather` with the initial Manila location (GeoNames ID 1701668; coordinates 14.5995, 120.9842). After selection, it uses that result’s returned latitude and longitude. The service requests weather from Open-Meteo's `/v1/forecast` endpoint with only `current` fields: `temperature_2m`, `apparent_temperature`, `relative_humidity_2m`, `wind_speed_10m`, `weather_code`, and `is_day`. It explicitly requests Celsius, km/h, Asia/Manila, and Unix timestamps. Open-Meteo may return a nearby model grid cell instead of the exact requested point.
 
-The JSON starts as `unknown`: the service validates the response shape, timezone, units, finite numeric values, humidity/wind ranges, weather-code integer, and day/night flag. Null or omitted readings remain unavailable. HTTP errors, rate limits, unreadable JSON, unexpected responses, network failures, and a 15-second timeout produce helpful errors. The effect stores loading, success, or error state; React renders the matching panel. Retry starts a new request. Unmount cleanup cancels the request and prevents outdated responses from changing state. React StrictMode may start then cancel an extra request during development.
+The JSON starts as `unknown`: the service validates the response shape, timezone, units, finite numeric values, humidity/wind ranges, weather-code integer, and day/night flag. Null or omitted readings remain unavailable. HTTP errors, rate limits, unreadable JSON, unexpected responses, network failures, and a 15-second timeout produce helpful errors. The effect stores loading, success, or error state; React renders the matching panel. Retry starts a new request. Changing location immediately aborts the old request and clears all old readings and timestamps before the new place heading appears. Effect cleanup also cancels requests. Aborted responses and errors cannot update the dashboard, even when a network request finishes late. React StrictMode may start then cancel an extra request during development.
 
-There is no backend, database, authentication, search, persisted location state, automatic polling, or caching. Refreshing the page requests data again; broader refresh behavior belongs to milestone 5.
+There is no backend, database, authentication, persisted location state, automatic polling, or caching. Refreshing the page requests data again; broader refresh behavior belongs to milestone 5.
 
 Tests use clearly isolated synthetic fixtures and mocked requests, never sample readings in the production dashboard. Vitest covers documented weather codes (including 97), unknown/missing codes, day/night icons, API success and failures, invalid data/units, missing values versus real zeroes, cancellation/timeout, Manila time conversion, and dashboard loading, errors, repeated retry, success, and cleanup.
 
@@ -65,14 +68,24 @@ Open-Meteo's current conditions use weather-model data, not a local station obse
 
 Temperatures use Celsius; wind speed uses km/h. Missing numeric readings display `—`. Missing or unknown weather codes display “Conditions unavailable” and a question-mark icon. Missing day/night information uses a neutral icon. No reading is substituted or inferred from another value. There is no freshness guarantee or automatic polling; check the model-valid time when assessing age. This is not an official PAGASA warning service.
 
-Precipitation and forecasts are not requested in milestone 2. Future precipitation probability (%) will be distinguished from rainfall amount (mm). Philippine-only geocoding will be introduced in milestone 3 after verifying its official documentation.
+Precipitation and forecasts remain disconnected until milestone 4. Future precipitation probability (%) will be distinguished from rainfall amount (mm).
+
+## Philippine location search
+
+The official [Open-Meteo geocoding documentation](https://open-meteo.com/en/docs/geocoding-api) was verified on October 25, 2026. Search sends a trimmed name to `/v1/search` with `countryCode=PH`, `count=10`, and `language=en`. The country filter is applied by the API before the result limit. Queries shorter than three characters do not make requests; input changes wait 300 ms before requesting. Each edit cancels the current request immediately, including during the next debounce. Version checks and abort signals stop late results/errors from replacing a newer search. Escape, focus leaving the search, selection, and unmount also cancel pending work.
+
+Geocoding turns the name into candidate places with stable GeoNames IDs and WGS84 coordinates. The client independently requires `country_code === "PH"`, valid numeric coordinates, an integer ID, and a nonempty name. It accepts active populated-place/administrative-seat codes (`PPL`, `PPLA` through `PPLA5`, `PPLC`) and excludes boundaries, mountains, and abandoned places. [GeoNames feature definitions](https://www.geonames.org/export/codes.html) describe these codes. The provider can include villages and other smaller populated places; the results are not an authoritative list of legally designated cities or municipalities. Coverage, aliases, and ranking depend on the provider, so try another spelling or a province/region qualifier if a place is missing. Administrative qualifiers follow the provider's matching rules.
+
+Results show province (`admin2`) and region (`admin1`) when returned, plus coordinates for disambiguation. Missing administrative fields are omitted rather than invented. Places with the same name remain separate results; duplicate IDs alone are removed. Selecting a result passes its full typed location object to the weather service, which sends those exact returned coordinates. Names are display labels, not lookup keys. The initial Manila seed retains milestone 2's coordinates; selecting Manila from search uses the coordinates returned by geocoding.
+
+Use Arrow Down/Up to navigate, Enter to select, and Escape to close. Focus stays on the labeled combobox during navigation and returns there after selection. The active result is connected through `aria-activedescendant`; results use listbox/option semantics. Loading, empty results, and errors have status text; a failed search offers retry for the current query. The dropdown scrolls vertically inside its input width on mobile. Location data attribution links Open-Meteo and GeoNames under CC BY 4.0 in the dropdown and below the dashboard.
 
 ## Verification
 
 - `npm run check`: lint, strict TypeScript, production build.
-- `npm test`: service validation and error cases, weather-code mapping, timestamp formatting, and dashboard state/retry behavior.
-- Live request checked both directly and in the browser.
-- Browser layout checked at 1280px desktop and in 320px/390px mobile iframe viewports, including loading, live conditions, timestamps, metrics, attribution, and forecast placeholders. This covers milestone 1's outstanding mobile check. These are browser viewport checks, not physical-device testing.
+- `npm test`: service validation/errors, weather-code mapping, timestamp formatting, dashboard state/retry, PH filtering, duplicate names/IDs, debounce, keyboard/click selection, and out-of-order search/weather responses. Synthetic fixtures remain isolated to tests; the dashboard uses real API data.
+- Live weather and geocoding requests checked directly and in the browser, including duplicate-name selection and the resulting location/weather update.
+- Browser layout checked at 1280px desktop and in 320px/390px mobile iframe viewports, including the search dropdown, result labels, selection, live weather, timestamps, attribution, and forecast placeholders. Milestone 1’s outstanding mobile layout check was covered in milestone 2. These are browser viewport checks, not physical-device testing.
 
 ## Build and deployment
 
