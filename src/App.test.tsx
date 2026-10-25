@@ -6,6 +6,9 @@ import App from "./App";
 import { fetchCurrentWeather } from "./services/weather";
 import type { CurrentWeather } from "./services/weather";
 
+vi.mock("./services/forecast", () => ({
+  fetchForecast: vi.fn(() => new Promise(() => {})),
+}));
 vi.mock("./services/weather", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./services/weather")>()),
   fetchCurrentWeather: vi.fn(),
@@ -46,7 +49,7 @@ describe("current-weather dashboard", () => {
     expect(screen.getByText(/Fetched by this app:/)).toBeTruthy();
     expect(screen.getByText(/Not a station observation/)).toBeTruthy();
     expect(
-      screen.getByText("Hourly and seven-day forecasts not connected yet"),
+      screen.getByText("Loading hourly and seven-day forecasts…"),
     ).toBeTruthy();
     expect(
       screen

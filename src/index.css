@@ -990,3 +990,237 @@ footer p {
     overflow-wrap: anywhere;
   }
 }
+
+/* Forecasts share a full-width time axis; daily cards wrap instead of overflowing. */
+.conditions-card {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.forecasts {
+  margin-top: 24px;
+  padding: 24px;
+  background: white;
+  border: 1px solid #dfe6e2;
+  border-radius: 14px;
+  min-width: 0;
+}
+.forecasts .section-heading h2 {
+  overflow-wrap: anywhere;
+}
+.forecast-intro,
+.forecast-definition,
+.daily-heading p,
+.forecast-fetch-time {
+  color: #526e5c;
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 12px;
+}
+.forecast-definition {
+  max-width: 820px;
+}
+.forecast-charts {
+  margin-top: 24px;
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.forecast-chart {
+  margin: 0;
+  min-width: 0;
+}
+.forecast-chart figcaption {
+  font-size: 13px;
+  font-weight: 650;
+  margin-bottom: 8px;
+}
+.forecast-chart figcaption span {
+  color: #526e5c;
+}
+.chart-container {
+  width: 100%;
+  height: 210px;
+  min-width: 0;
+}
+.forecast-tooltip {
+  max-width: 220px;
+  border: 1px solid #bccfbf;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 16px #184f4320;
+  padding: 12px;
+  font-size: 12px;
+  color: #203c38;
+  line-height: 1.8;
+}
+.forecast-tooltip strong {
+  font-size: 11px;
+}
+.forecast-tooltip small {
+  font-size: 10px;
+  color: #526e5c;
+}
+.hourly-table {
+  margin: 20px 0;
+  padding: 14px 0;
+  border-top: 1px solid #e0e8e1;
+  border-bottom: 1px solid #e0e8e1;
+}
+.hourly-table summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #245a40;
+  font-weight: 600;
+}
+.hourly-table summary:focus-visible {
+  outline: 3px solid #b66b20;
+  outline-offset: 4px;
+}
+.hourly-table table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 12px;
+}
+.hourly-table caption {
+  text-align: left;
+  font-size: 10px;
+  color: #526e5c;
+  padding-bottom: 12px;
+  line-height: 1.6;
+}
+.hourly-table th,
+.hourly-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e5ece7;
+  overflow-wrap: anywhere;
+}
+.hourly-table thead th {
+  font-weight: 650;
+  background: #f0f5f1;
+}
+.hourly-table tbody th {
+  font-weight: 400;
+}
+.daily-heading h3 {
+  font-size: 14px;
+  font-weight: 650;
+}
+.daily-heading p {
+  margin: 6px 0 18px;
+}
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+.daily-card {
+  padding: 17px 12px;
+  background: #f5f8f5;
+  border: 1px solid #e0e8e1;
+  border-radius: 9px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.daily-card h4 {
+  font-size: 12px;
+  font-weight: 650;
+}
+.daily-card time {
+  display: block;
+  font-size: 10px;
+  color: #526e5c;
+}
+.daily-card > svg {
+  display: block;
+  margin: 18px 0 12px;
+  color: #5c8268;
+}
+.daily-condition {
+  min-height: 53px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+.daily-card strong {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+}
+.daily-card > p:not(.daily-condition) {
+  color: #526e5c;
+  margin-top: 6px;
+}
+.daily-probability {
+  padding-top: 12px;
+  border-top: 1px solid #dce6dd;
+  margin-top: 12px !important;
+}
+.daily-probability span {
+  display: block;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.daily-probability strong {
+  color: #386e9c;
+  margin-top: 6px;
+}
+.forecast-message {
+  text-align: center;
+  padding: 30px 0;
+  color: #526e5c;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.forecast-message > svg {
+  display: block;
+  margin: 0 auto 15px;
+}
+.forecast-message h3 {
+  font-size: 15px;
+}
+.forecast-message p {
+  margin-top: 8px;
+}
+.forecast-message button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 1050px) {
+  .daily-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .forecasts {
+    padding: 18px 12px;
+  }
+  .forecasts > .section-heading {
+    align-items: flex-start;
+  }
+  .forecasts > .section-heading > span {
+    flex-shrink: 0;
+  }
+  .daily-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .daily-card {
+    padding: 14px 12px;
+  }
+  .hourly-table th,
+  .hourly-table td {
+    padding: 9px 5px;
+    font-size: 10px;
+  }
+  .hourly-table table th:first-child {
+    width: 42%;
+  }
+  .forecast-tooltip {
+    max-width: 180px;
+  }
+}

@@ -9,6 +9,9 @@ import { MANILA } from "./services/locations";
 import type { WeatherLocation } from "./services/locations";
 import type { CurrentWeather } from "./services/weather";
 
+vi.mock("./services/forecast", () => ({
+  fetchForecast: vi.fn(() => new Promise(() => {})),
+}));
 vi.mock("./services/geocoding", () => ({ searchLocations: vi.fn() }));
 vi.mock("./services/weather", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./services/weather")>()),

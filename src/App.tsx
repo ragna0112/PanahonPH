@@ -11,7 +11,6 @@ import {
   Radio,
   Code2,
   Sun,
-  CalendarDays,
   Moon,
   CloudMoon,
   CloudFog,
@@ -22,7 +21,7 @@ import {
   CircleHelp,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { fetchCurrentWeather, formatManilaTime } from "./services/weather";
 import LocationSearch from "./components/LocationSearch";
 import { MANILA, locationDetails } from "./services/locations";
@@ -31,6 +30,8 @@ import type { CurrentWeather } from "./services/weather";
 import { describeWeather } from "./services/weatherCodes";
 import type { WeatherIcon } from "./services/weatherCodes";
 import type { LucideIcon } from "lucide-react";
+
+const ForecastPanel = lazy(() => import("./components/ForecastPanel"));
 
 const weatherIcons: Record<WeatherIcon, LucideIcon> = {
   sun: Sun,
@@ -348,29 +349,6 @@ function App() {
               />
             </div>
           </section>
-          <section className="forecast-card" aria-labelledby="forecast-title">
-            <div className="section-heading">
-              <h2 id="forecast-title">
-                <CalendarDays size={18} /> Looking ahead
-              </h2>
-              <span className="tiny-badge">MILESTONE 4</span>
-            </div>
-            <div className="forecast-empty">
-              <span className="forecast-icon">
-                <Sun size={24} />
-                <span>···</span>
-                <Cloud size={24} />
-              </span>
-              <h3>A forecast worth planning around.</h3>
-              <p>
-                Hourly temperature, chance of rain, and a seven-day outlook will
-                appear here once connected.
-              </p>
-              <span className="forecast-note">
-                Hourly and seven-day forecasts not connected yet
-              </span>
-            </div>
-          </section>
         </div>
         <p className="data-attribution">
           <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a> ·{" "}
@@ -379,6 +357,18 @@ function App() {
           Location data via Open-Meteo /{" "}
           <a href="https://www.geonames.org/">GeoNames</a>.
         </p>
+        <Suspense
+          fallback={
+            <section className="forecasts" role="status">
+              Loading hourly and seven-day forecasts…
+            </section>
+          }
+        >
+          <ForecastPanel
+            key={`${location.id}:${location.latitude}:${location.longitude}`}
+            location={location}
+          />
+        </Suspense>
         <section id="project" className="project-note">
           <span className="note-icon">
             <CloudSun size={21} />
@@ -386,12 +376,12 @@ function App() {
           <div>
             <h2>Good things are on the horizon.</h2>
             <p>
-              Philippine location search is connected. Choose a place to see its
-              current weather. Forecasts and favorites are up next.
+              Current weather, hourly charts, and seven-day forecasts are
+              connected. Saved places are up next.
             </p>
           </div>
           <span className="progress-badge">
-            03 <span>/ 07 milestones</span>
+            04 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>
