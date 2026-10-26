@@ -245,3 +245,24 @@ describe("location search interaction", () => {
     expect(signal?.aborted).toBe(true);
   });
 });
+
+it("does not select a result when Enter is used to finish IME composition", async () => {
+  search.mockResolvedValue(places);
+  const select = vi.fn();
+  render(<LocationSearch onSelect={select} />);
+  typeQuery("San Jose");
+  await advance();
+  const input = screen.getByRole("combobox");
+  fireEvent.keyDown(input, { key: "ArrowDown" });
+  const active = input.getAttribute("aria-activedescendant");
+  expect(document.getElementById(active!)?.getAttribute("aria-selected")).toBe(
+    "true",
+  );
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+  expect(select).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(select).toHaveBeenCalledWith(places[0]);
+  expect(input.getAttribute("aria-expanded")).toBe("false");
+  expect(input.getAttribute("aria-activedescendant")).toBeNull();
+  expect(document.activeElement).toBe(input);
+});

@@ -2,6 +2,7 @@
 import { clearWeatherCache } from "./services/weatherCache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import axe from "axe-core";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { fetchCurrentWeather } from "./services/weather";
@@ -126,4 +127,51 @@ describe("current-weather dashboard", () => {
     unmount();
     expect(signal?.aborted).toBe(true);
   });
+});
+
+it("provides landmarks, a focusable skip target, a selected-place heading, and concise status", async () => {
+  fetchWeather.mockResolvedValue(weather);
+  render(<App />);
+  await screen.findByText("30.2°C");
+  const main = screen.getByRole("main");
+  expect(main.tabIndex).toBe(-1);
+  expect(
+    screen.getByRole("link", { name: "Skip to content" }).getAttribute("href"),
+  ).toBe("#main");
+  expect(
+    screen.getByRole("heading", {
+      level: 2,
+      name: "Manila Metro Manila, Philippines",
+    }),
+  ).toBeTruthy();
+  const status = screen.getByText("Current weather for Manila updated.");
+  expect(status.getAttribute("role")).toBe("status");
+  expect(status.textContent).not.toContain("30.2");
+  // Canvas-dependent contrast/visible-label checks run in the real browser instead.
+  const results = await axe.run(document.body, {
+    runOnly: {
+      type: "tag",
+      values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+    },
+    rules: {
+      "color-contrast": { enabled: false },
+      "label-content-name-mismatch": { enabled: false },
+    },
+  });
+  expect(results.violations.map((v) => v.id)).toEqual([]);
+});
+it("keeps keyboard focus on the location heading when retry removes its button", async () => {
+  fetchWeather
+    .mockRejectedValueOnce(new Error("Offline"))
+    .mockResolvedValueOnce(weather);
+  render(<App />);
+  const retry = await screen.findByRole("button", {
+    name: "Retry weather request",
+  });
+  retry.focus();
+  await userEvent.keyboard("{Enter}");
+  await screen.findByText("30.2°C");
+  expect(document.activeElement).toBe(
+    screen.getByRole("heading", { name: "Manila Metro Manila, Philippines" }),
+  );
 });

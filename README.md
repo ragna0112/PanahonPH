@@ -4,14 +4,14 @@ A student portfolio project built one milestone at a time: readable, responsive 
 
 ## Current progress
 
-Milestones 1–5 are complete. Manila is the initial location, and Philippine location search lets you choose other places. The dashboard fetches current modeled weather for the selected location: temperature, feels-like temperature, relative humidity, wind speed, and understandable conditions with day/night icons. Loading, missing readings, service failures, and retry are handled. Favorite locations are saved in this browser; manual refresh updates both independent weather requests. Two aligned hourly charts and seven daily forecast cards are connected, with a table alternative for every hourly reading.
+Milestones 1–6 are complete. Manila is the initial location, and Philippine location search lets you choose other places. The dashboard fetches current modeled weather for the selected location: temperature, feels-like temperature, relative humidity, wind speed, and understandable conditions with day/night icons. Loading, missing readings, service failures, and retry are handled. Favorite locations are saved in this browser; manual refresh updates both independent weather requests. Two aligned hourly charts and seven daily forecast cards are connected, with a table alternative for every hourly reading.
 
 - [x] 1 — Project foundation and responsive dashboard shell
 - [x] 2 — Live current weather for Manila
 - [x] 3 — Philippine city and municipality search
 - [x] 4 — Hourly charts and seven-day forecasts
 - [x] 5 — Favorites and refresh behavior
-- [ ] 6 — Interface polish and accessibility
+- [x] 6 — Interface polish and accessibility
 - [ ] 7 — Final verification and deployment preparation
 
 ## Run locally
@@ -104,7 +104,7 @@ The two charts share time axes and synchronized tooltips. Temperature uses °C; 
 
 Tooltips include date, time, value, and unit. The keyboard-accessible “View all 24 hourly values as a table” disclosure supplies every reading without requiring chart interaction. Daily cards wrap into two columns on mobile, and the table fits the page width. Model forecast valid times/dates are distinct from **Forecast fetched by this app**, which is the device-clock receipt time, not the model run time. Provider and CC BY 4.0 attribution appear inside the forecast panel.
 
-Current weather and forecasts have independent requests, loading/error states, and retry buttons. A forecast failure does not clear successful current weather; retrying forecasts does not request current weather again. During a same-location refresh, successful earlier readings stay visible. A failed refresh explicitly labels those readings as coming from an earlier fetch. Fetch timestamps advance only after success. The forecast panel is keyed by selected ID and coordinates, so location changes immediately unmount the old panel and cancel its request. Old results and cancelled errors cannot overwrite the new panel. The selected-location refresh button bypasses the application freshness cache for both resources and stays disabled while either is in flight.
+Current weather and forecasts have independent requests, loading/error states, and retry buttons. A forecast failure does not clear successful current weather; retrying forecasts does not request current weather again. During a same-location refresh, successful earlier readings stay visible. A failed refresh explicitly labels those readings as coming from an earlier fetch. Fetch timestamps advance only after success. The forecast panel is keyed by selected ID and coordinates, so location changes immediately unmount the old panel and cancel its request. Old results and cancelled errors cannot overwrite the new panel. The selected-location refresh button bypasses the application freshness cache for both resources. While either is in flight, `aria-disabled` exposes its unavailable state and an event-handler guard prevents duplicate requests while preserving keyboard focus.
 
 ## Favorites, cache, and refresh
 
@@ -122,12 +122,34 @@ Save/remove works in memory even if localStorage is blocked or full. The UI expl
 
 - `npm run check`: lint, strict TypeScript, production build.
 - `npm test`: service validation/errors, weather-code mapping, timestamp formatting, dashboard state/retry, PH filtering, duplicate names/IDs, debounce, keyboard/click selection, and out-of-order search/weather/forecast responses. Forecast tests include malformed/missing arrays, missing-value chart gaps, 24-hour selection across midnight, seven-day labels, probability units/axis, tooltips, independent failures/retry, and Manila formatting with a different default timezone. Synthetic fixtures remain isolated to tests; the dashboard uses real API data.
-- All 174 tests passed under `TZ=America/New_York npm test`; an explicit default-timezone override test verifies Manila formatting. The operating system/browser timezone setting itself was not changed.
+- All 179 tests passed under `TZ=America/New_York npm test`; an explicit default-timezone override test verifies Manila formatting. The operating system/browser timezone setting itself was not changed.
 - The live Milestone 5 browser flow saved Manila and Cebu City, reloaded to confirm persistence, switched between both, verified cached timestamps on returning to Manila, manually refreshed both resources, and removed active Manila while leaving its weather displayed. Desktop (1280px) and mobile (320px/390px) layouts fit without horizontal overflow. Actual wall-clock hour/midnight rollover was verified with controlled-clock tests rather than waiting in the browser.
 - Milestone 5 tests cover storage corruption/quota/unavailability, favorite reload/selection/identity, bounded cache/expiration, manual bypass, retained readings and partial failures, in-flight deduplication, rapid switching, controlled-clock hour/midnight rollover, hidden-tab return, insufficient coverage, and timer/listener cleanup.
 - Page scroll width matched viewport width at 320px, 390px, and 1280px, with no page-level horizontal overflow.
 - Live weather and geocoding requests checked directly and in the browser, including duplicate-name selection and the resulting location/weather update.
 - Browser layout checked at 1280px desktop and 320px/390px browser viewport overrides (also in mobile iframe viewports), including live forecasts for Manila and Cebu City, chart labels/tooltips, daily cards, the hourly table, timestamps, and attribution. Milestone 1’s outstanding mobile layout check was covered in milestone 2. These are browser viewport checks, not physical-device testing.
+
+## Interface polish and accessibility
+
+Milestone 6 preserves the green/gold visual direction and the existing services, persistence, cache, cancellation, and rollover logic. Selected places now use an actual level-two heading, with larger place names and temperature, readable administrative labels, and consistent metric/card typography. Text sizes use rem units; buttons have a 44px minimum height, and removal controls are at least 44px wide. Long names wrap, and the header/cards reflow instead of clipping when text is enlarged. A temperature can break before its Celsius unit at extreme text sizes.
+
+Search has a persistent visible label and retains the combobox/listbox, active-descendant, arrow-key, Enter, and Escape behavior. Enter during IME composition does not prematurely select a result. The favorite toggle keeps a stable accessible name with `aria-pressed`; filled-star/border styling indicates its saved state, and the active favorite also says “Selected.” Save/remove actions have short status announcements. Removing a row returns focus to the save toggle. Current-weather and forecast retry focus their stable headings before the retry button disappears. Refresh remains focusable but unavailable during requests, so keyboard users keep their place.
+
+The skip link focuses the main landmark. Heading levels follow the page/section/daily-card hierarchy. Short, separate polite status messages announce current-weather and forecast loading/success/failure, rather than rereading the entire weather card. Detailed errors remain visible beside retry controls; retained data is explicitly labeled as an earlier fetch. Storage warnings remain announced. Focus rings have contrasting colors on light and dark panels. Error messages and active-place text provide cues beyond color. Reduced-motion CSS disables animations/transitions; charts already render without animation.
+
+Chart labels and tooltips are larger, with fewer time-axis labels to prevent collisions. The probability axis stays at 0–100%. The full 24-row table remains available through a keyboard-operated disclosure. Its abbreviated column labels expand through native abbreviation titles. At enlarged text sizes, a named, focusable region scrolls the table locally; the page itself does not scroll sideways. Daily cards adapt their column count to available space and text size.
+
+Milestone 6 verification on October 26, 2026:
+
+- `npm run check` and all 179 Vitest tests pass, including the full suite with `TZ=America/New_York`. New regression checks cover landmarks/skip targets, selected-location headings, concise status text, IME selection protection, favorite announcements/toggle state/removal focus, retry focus, table keyboard access, and refresh focus/in-flight guards. Existing weather/search/favorite/cache/rollover tests remain intact.
+- axe-core 4.14.0 is a **development-only** dependency. Vitest scans the dashboard and expanded forecast table for WCAG A/AA structural issues; jsdom contrast and canvas-dependent visible-label checking are disabled because jsdom cannot reliably render them. The real browser scan included WCAG 2/2.1 A/AA rules and best practices, found text-contrast/visible-label issues, and reported zero violations after fixes. Some chart contrast checks were marked incomplete, so the automated result is not a full WCAG compliance claim.
+- In the browser, rendered foreground/background pairs were cross-checked with WCAG relative-luminance calculations; the checked visible text pairs met at least 4.5:1. The input boundary and button borders were checked against 3:1, and focus indicators use a light ring on the dark card and a brown ring on light panels. Decorative weather/metric icons are paired with readable labels.
+- Browser viewport checks covered **320, 390, 768, and 1280 CSS pixels**, both normal text and a doubled root text size (200%). Page scroll width matched viewport width. A tablet header overflow exposed by enlarged text was fixed. Charts, tooltip values, daily cards, long names/province labels, and the expanded forecast table were visually inspected; the table scrolls inside its own region when necessary.
+- Manual browser keyboard checks covered skip-to-content, search arrows/Enter/Escape, selection, saving, switching to a favorite, removal and focus recovery, refresh, and search/current-weather/forecast retries. Live Manila/Cebu City weather and forecasts continued to load; refresh kept focus and successful same-location readings visible.
+- A temporary, isolated browser QA entry used synthetic responses to exercise loading, empty search results, initial request errors, failed refresh with stale readings, long location labels, missing chart values, and blocked storage/session favorites. It was removed before the production build and commit. No mock data is imported by the production entry.
+- [Before](docs/screenshots/milestone6-before.png) and [after](docs/screenshots/milestone6-after.png) desktop captures document the visual changes using live weather.
+
+Remaining verification limits: the available in-app browser does not expose native browser zoom, and its zoom shortcut had no effect. **Native 200% browser zoom was not verified**; 200% text resizing and a 640px viewport (the CSS-width equivalent of a 1280px view at 200% zoom) were checked instead. No physical-device or screen-reader testing was performed. Synchronized pointer tooltips supplement, rather than replace, the keyboard-accessible table. Provider failures and model-data limitations still apply. Deployment preparation remains milestone 7.
 
 ## Build and deployment
 

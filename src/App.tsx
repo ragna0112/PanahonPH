@@ -20,7 +20,7 @@ import {
   CircleHelp,
   RefreshCw,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { fetchCurrentWeather, formatManilaTime } from "./services/weather";
 import LocationSearch from "./components/LocationSearch";
 import { MANILA, locationDetails } from "./services/locations";
@@ -77,6 +77,11 @@ function App() {
   const current = useWeatherResource(location, "current", fetchCurrentWeather);
   const [refreshToken, setRefreshToken] = useState(0);
   const [forecastBusy, setForecastBusy] = useState(true);
+  const locationHeading = useRef<HTMLHeadingElement>(null);
+  const retryCurrent = () => {
+    locationHeading.current?.focus();
+    current.refresh();
+  };
   const data = current.data ?? null;
   const state = {
     status: data ? "success" : current.pending ? "loading" : "error",
@@ -108,13 +113,13 @@ function App() {
         Skip to content
       </a>
       <header className="topbar">
-        <a href="#" className="brand" aria-label="PanahonPH home">
+        <a href="#" className="brand">
           <span className="brand-mark">
-            <CloudSun size={27} />
+            <CloudSun size={27} aria-hidden="true" />
           </span>
           <span>
             Panahon<span className="brand-ph">PH</span>
-            <small>YOUR LOCAL SKY, AT A GLANCE</small>
+            <small aria-hidden="true">YOUR LOCAL SKY, AT A GLANCE</small>
           </span>
         </a>
         <nav aria-label="Main navigation">
@@ -129,7 +134,7 @@ function App() {
           <span /> Philippines
         </span>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <div className="intro">
           <div>
             <p className="eyebrow">A LITTLE CLARITY, RAIN OR SHINE</p>
@@ -151,7 +156,7 @@ function App() {
         </div>
         <div className="refresh-toolbar">
           <button
-            disabled={current.pending || forecastBusy}
+            aria-disabled={current.pending || forecastBusy}
             onClick={() => {
               if (current.pending || forecastBusy) return;
               current.refresh();
@@ -165,13 +170,20 @@ function App() {
           </button>
           <span>Refresh gets new data for {location.name}.</span>
         </div>
+        <p className="sr-only" role="status" aria-atomic="true">
+          {current.pending
+            ? `Loading current weather for ${location.name}.`
+            : current.error
+              ? `Current weather for ${location.name} could not be updated.`
+              : `Current weather for ${location.name} updated.`}
+        </p>
         <div className="dashboard-grid">
           <section className="current-card" aria-labelledby="current-title">
             <div className="card-top">
-              <span className="location">
+              <h2 className="location" ref={locationHeading} tabIndex={-1}>
                 <MapPin size={18} /> {location.name}{" "}
                 <small>{locationDetails(location)}</small>
-              </span>
+              </h2>
               <span className="outline-badge">
                 {state.status === "success"
                   ? "MODEL DATA"
@@ -181,53 +193,59 @@ function App() {
               </span>
             </div>
             {data && current.pending && (
-              <p className="current-update" role="status">
+              <p className="current-update">
                 Updating current weather. Earlier readings remain visible.
               </p>
             )}
             {data && current.error && (
-              <div className="current-update" role="status">
+              <div className="current-update">
                 <p>
                   Current weather refresh failed: {current.error} Displayed
                   readings are from an earlier fetch.
                 </p>
-                <button className="retry-button" onClick={current.refresh}>
+                <button className="retry-button" onClick={retryCurrent}>
                   Retry weather request
                 </button>
               </div>
             )}
             <div className="current-body" aria-busy={current.pending}>
-              <div className="current-content" role="status" aria-live="polite">
+              <div className="current-content">
                 <p className="eyebrow" id="current-title">
                   CURRENT WEATHER
                 </p>
                 {state.status === "loading" ? (
                   <>
-                    <h2>
+                    <h3>
                       Checking
                       <br />
                       {location.name}’s sky…
-                    </h2>
+                    </h3>
                     <p>Loading current weather from Open-Meteo.</p>
                   </>
                 ) : state.status === "error" ? (
                   <>
-                    <h2>
+                    <h3>
                       A little cloudy
                       <br />
                       on our end.
-                    </h2>
+                    </h3>
                     <p>{state.message}</p>
-                    <button className="retry-button" onClick={current.refresh}>
+                    <button className="retry-button" onClick={retryCurrent}>
                       <RefreshCw size={14} aria-hidden="true" /> Retry weather
                       request
                     </button>
                   </>
                 ) : (
                   <>
-                    <h2 className="live-temperature">
-                      {reading(data?.temperature, "°C")}
-                    </h2>
+                    <p className="live-temperature">
+                      {reading(data?.temperature, "")}
+                      {data?.temperature != null && (
+                        <>
+                          <wbr />
+                          °C
+                        </>
+                      )}
+                    </p>
                     <p className="weather-description">
                       {condition.description}
                     </p>
@@ -364,7 +382,7 @@ function App() {
             </p>
           </div>
           <span className="progress-badge">
-            05 <span>/ 07 milestones</span>
+            06 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>

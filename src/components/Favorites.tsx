@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { MapPin, Star, Trash2 } from "lucide-react";
 import { locationDetails } from "../services/locations";
 import type { WeatherLocation } from "../services/locations";
@@ -11,6 +11,7 @@ export default function Favorites({
   onSelect: (place: WeatherLocation) => void;
 }) {
   const favorites = useFavorites();
+  const [announcement, setAnnouncement] = useState("");
   const saveButton = useRef<HTMLButtonElement>(null);
   const saved = favorites.locations.some((place) => place.id === location.id);
   return (
@@ -24,16 +25,28 @@ export default function Favorites({
       <button
         ref={saveButton}
         className="save-location"
-        onClick={() =>
-          saved ? favorites.remove(location.id) : favorites.save(location)
-        }
+        onClick={() => {
+          if (saved) favorites.remove(location.id);
+          else favorites.save(location);
+          setAnnouncement(
+            `${location.name} ${saved ? "removed from" : "added to"} favorites.`,
+          );
+        }}
+        aria-label={`Save ${location.name} to favorites`}
         aria-pressed={saved}
+        aria-describedby="favorite-toggle-help"
       >
         <Star size={15} aria-hidden="true" />
-        {saved
-          ? `Remove ${location.name} from favorites`
-          : `Save ${location.name} to favorites`}
+        <span>Save {location.name} to favorites</span>
       </button>
+      <p id="favorite-toggle-help" className="favorite-help">
+        {saved
+          ? "Saved. Press again to remove."
+          : "Save this place for quick access."}
+      </p>
+      <p className="sr-only" role="status" aria-atomic="true">
+        {announcement}
+      </p>
       {favorites.warning && (
         <p className="storage-warning" role="status">
           {favorites.warning}
@@ -54,12 +67,12 @@ export default function Favorites({
           {favorites.locations.map((place) => (
             <li key={place.id}>
               <button
-                aria-label={`Select ${place.name}, ${locationDetails(place)}`}
+                aria-label={`Select ${place.name}, ${locationDetails(place)}${place.id === location.id ? " · Selected" : ""}`}
                 className="favorite-select"
                 onClick={() => onSelect(place)}
                 aria-current={place.id === location.id ? "location" : undefined}
               >
-                <strong>{place.name}</strong>
+                <strong>{place.name}</strong>{" "}
                 <small>{locationDetails(place)}</small>
               </button>
               <button
@@ -67,6 +80,7 @@ export default function Favorites({
                 aria-label={`Remove ${place.name}, ${locationDetails(place)} from favorites`}
                 onClick={() => {
                   favorites.remove(place.id);
+                  setAnnouncement(`${place.name} removed from favorites.`);
                   saveButton.current?.focus();
                 }}
               >
@@ -76,10 +90,7 @@ export default function Favorites({
           ))}
         </ul>
       )}
-      <p className="favorites-note">
-        Saved only in this browser. Weather readings are not stored with
-        favorites.
-      </p>
+      <p className="favorites-note">Saved only in this browser.</p>
     </aside>
   );
 }

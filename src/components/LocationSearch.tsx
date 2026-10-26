@@ -76,12 +76,15 @@ export default function LocationSearch({
         if (!event.currentTarget.contains(event.relatedTarget)) close();
       }}
     >
+      <label className="search-label" htmlFor="location-query">
+        Search Philippine locations
+      </label>
       <div className="search-box">
         <Search size={20} aria-hidden="true" />
         <input
+          id="location-query"
           ref={input}
           role="combobox"
-          aria-label="Search Philippine cities and municipalities"
           aria-expanded={open}
           aria-controls={open ? "location-results" : undefined}
           aria-autocomplete="list"
@@ -114,6 +117,7 @@ export default function LocationSearch({
             }
           }}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
             if (event.key === "Escape") {
               event.preventDefault();
               close();

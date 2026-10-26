@@ -197,7 +197,11 @@ describe("forecast requests alongside current weather", () => {
           failCurrent = reject;
         }),
     );
-    fireEvent.click(button);
+    button.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(document.activeElement).toBe(button);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    await userEvent.keyboard("{Enter}");
     fireEvent.click(button);
     expect(currentFetch).toHaveBeenCalledTimes(2);
     expect(screen.getByText("30.2°C")).toBeTruthy();

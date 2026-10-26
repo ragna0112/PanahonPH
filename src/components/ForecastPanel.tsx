@@ -71,10 +71,10 @@ function HourTick({
       y={Number(y) + 12}
       textAnchor="middle"
       fill="#526e5c"
-      fontSize={10}
+      fontSize="0.75rem"
     >
       <tspan x={x}>{date}</tspan>
-      <tspan x={x} dy={14}>
+      <tspan x={x} dy="1.3em">
         {formatForecastHour(payload.value)}
       </tspan>
     </text>
@@ -108,6 +108,11 @@ export default function ForecastPanel({
       error ??
       "Earlier forecast data no longer covers the required window. Please retry.",
   };
+  const heading = useRef<HTMLHeadingElement>(null);
+  const retryForecast = () => {
+    heading.current?.focus();
+    refresh();
+  };
   const syncId = useId();
   const lastRefresh = useRef(refreshToken);
   const lastAutomaticHour = useRef<number | null>(null);
@@ -139,23 +144,29 @@ export default function ForecastPanel({
     <section
       className="forecasts"
       aria-labelledby="forecast-title"
-      aria-busy={pending}
     >
       <div className="section-heading">
-        <h2 id="forecast-title">
+        <h2 id="forecast-title" ref={heading} tabIndex={-1}>
           <CalendarDays size={18} aria-hidden="true" /> Looking ahead ·{" "}
           {location.name}
         </h2>
         <span>Asia/Manila</span>
       </div>
+      <p className="sr-only" role="status" aria-atomic="true">
+        {pending
+          ? `Loading forecasts for ${location.name}.`
+          : error || !window
+            ? `Forecasts for ${location.name} could not be updated.`
+            : `Forecasts for ${location.name} updated.`}
+      </p>
       {rawData && pending && (
-        <p className="forecast-refresh-status" role="status">
+        <p className="forecast-refresh-status">
           Updating forecasts. Earlier readings remain visible when they cover
           the current window.
         </p>
       )}
       {rawData && error && (
-        <div className="forecast-refresh-status" role="status">
+        <div className="forecast-refresh-status">
           <p>
             Forecast refresh failed: {error}{" "}
             {window
@@ -167,14 +178,14 @@ export default function ForecastPanel({
             Asia/Manila
           </p>
           {window && (
-            <button className="search-retry" onClick={refresh}>
+            <button className="search-retry" onClick={retryForecast}>
               Retry forecasts
             </button>
           )}
         </div>
       )}
       {state.status !== "success" ? (
-        <div className="forecast-message" role="status" aria-live="polite">
+        <div className="forecast-message">
           <TrendingUp size={28} aria-hidden="true" />
           <h3>
             {state.status === "loading"
@@ -184,14 +195,13 @@ export default function ForecastPanel({
           {state.status === "error" && (
             <>
               <p>{state.message}</p>
-              <button className="search-retry" onClick={refresh}>
+              <button className="search-retry" onClick={retryForecast}>
                 <RefreshCw size={14} aria-hidden="true" /> Retry forecasts
               </button>
             </>
           )}
           <p>
-            Current weather has its own request and remains available if it
-            succeeds.
+            You can still use current weather while forecasts are unavailable.
           </p>
         </div>
       ) : (
@@ -249,25 +259,26 @@ export default function ForecastPanel({
                       <CartesianGrid stroke="#e5ece7" vertical={false} />
                       <XAxis
                         dataKey="time"
-                        ticks={[0, 8, 16, 23].map(
+                        ticks={[0, 12, 23].map(
                           (index) => state.data.hourly[index].time,
                         )}
                         tick={<HourTick />}
-                        height={42}
-                        interval={0}
+                        height={72}
+                        interval="preserveStartEnd"
+                        minTickGap={24}
                         padding={{ left: 12, right: 12 }}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis
-                        width={40}
+                        width={52}
                         domain={
                           chart.unit === "%" ? [0, 100] : ["auto", "auto"]
                         }
                         ticks={
                           chart.unit === "%" ? [0, 25, 50, 75, 100] : undefined
                         }
-                        tick={{ fontSize: 10, fill: "#526e5c" }}
+                        tick={{ fontSize: "0.75rem", fill: "#526e5c" }}
                         tickLine={false}
                         axisLine={false}
                         allowDataOverflow={chart.unit === "%"}
@@ -302,41 +313,52 @@ export default function ForecastPanel({
           </div>
           <details className="hourly-table">
             <summary>View all 24 hourly values as a table</summary>
-            <table>
-              <caption>
-                Hourly forecast · Asia/Manila. Probability applies to the
-                preceding hour; — means unavailable.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Forecast date &amp; time</th>
-                  <th scope="col">Temperature (°C)</th>
-                  <th scope="col">Precipitation probability (%)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.data.hourly.map((point) => (
-                  <tr key={point.time}>
-                    <th scope="row">
-                      <time dateTime={new Date(point.time).toISOString()}>
-                        {formatForecastDate(point.time)} ·{" "}
-                        {formatForecastHour(point.time)}
-                      </time>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Hourly forecast table, scroll horizontally if needed"
+              tabIndex={0}
+            >
+              <table>
+                <caption>
+                  Hourly forecast · Asia/Manila. Probability applies to the
+                  preceding hour; — means unavailable.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Date &amp; time</th>
+                    <th scope="col">
+                      <abbr title="Temperature">Temp.</abbr> (°C)
                     </th>
-                    <td>
-                      {point.temperature === null
-                        ? "—"
-                        : reading(point.temperature, "°C")}
-                    </td>
-                    <td>
-                      {point.precipitationProbability === null
-                        ? "—"
-                        : reading(point.precipitationProbability, "%")}
-                    </td>
+                    <th scope="col">
+                      <abbr title="Precipitation">Precip.</abbr> probability (%)
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {state.data.hourly.map((point) => (
+                    <tr key={point.time}>
+                      <th scope="row">
+                        <time dateTime={new Date(point.time).toISOString()}>
+                          {formatForecastDate(point.time)} ·{" "}
+                          {formatForecastHour(point.time)}
+                        </time>
+                      </th>
+                      <td>
+                        {point.temperature === null
+                          ? "—"
+                          : reading(point.temperature, "°C")}
+                      </td>
+                      <td>
+                        {point.precipitationProbability === null
+                          ? "—"
+                          : reading(point.precipitationProbability, "%")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </details>
           <div className="daily-heading">
             <h3>Seven-day forecast</h3>

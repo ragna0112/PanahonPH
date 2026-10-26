@@ -35,12 +35,15 @@ it("saves, persists after remount, selects and removes without changing the disp
   render(<Favorites location={MANILA} onSelect={onSelect} />);
   fireEvent.click(
     screen.getByRole("button", {
-      name: "Select Manila, Metro Manila, Philippines",
+      name: "Select Manila, Metro Manila, Philippines · Selected",
     }),
   );
   expect(onSelect).toHaveBeenCalledWith(MANILA);
   fireEvent.click(
-    screen.getByRole("button", { name: "Remove Manila from favorites" }),
+    screen.getByRole("button", {
+      name: "Save Manila to favorites",
+      pressed: true,
+    }),
   );
   expect(screen.getByText(/Save this location/)).toBeTruthy();
   expect(
@@ -58,7 +61,8 @@ it("treats the same ID with new labels/coordinates as the same favorite", () => 
   );
   expect(
     screen.getByRole("button", {
-      name: "Remove City of Manila from favorites",
+      name: "Save City of Manila to favorites",
+      pressed: true,
     }),
   ).toBeTruthy();
   expect(screen.getByText("1 saved")).toBeTruthy();
@@ -84,7 +88,10 @@ it("keeps session save/remove usable when storage cannot be read or written", ()
   expect(screen.getByText("1 saved")).toBeTruthy();
   expect(screen.getByText(/Changes could not be saved/)).toBeTruthy();
   fireEvent.click(
-    screen.getByRole("button", { name: "Remove Manila from favorites" }),
+    screen.getByRole("button", {
+      name: "Save Manila to favorites",
+      pressed: true,
+    }),
   );
   expect(screen.getByText("0 saved")).toBeTruthy();
 });
@@ -98,4 +105,25 @@ it("handles quota errors without rolling back session favorites", () => {
   );
   expect(screen.getByText("1 saved")).toBeTruthy();
   expect(screen.getByText(/Changes could not be saved/)).toBeTruthy();
+});
+
+it("announces save/remove, exposes the toggle state, and restores focus after removing a row", () => {
+  render(<Favorites location={MANILA} onSelect={vi.fn()} />);
+  const save = screen.getByRole("button", {
+    name: "Save Manila to favorites",
+    pressed: false,
+  });
+  fireEvent.click(save);
+  expect(save.getAttribute("aria-pressed")).toBe("true");
+  expect(
+    screen.getByText("Manila added to favorites.").getAttribute("role"),
+  ).toBe("status");
+  const remove = screen.getByRole("button", {
+    name: /Remove Manila,.*from favorites/,
+  });
+  remove.focus();
+  fireEvent.click(remove);
+  expect(document.activeElement).toBe(save);
+  expect(save.getAttribute("aria-pressed")).toBe("false");
+  expect(screen.getByText("Manila removed from favorites.")).toBeTruthy();
 });

@@ -9,6 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import axe from "axe-core";
 import userEvent from "@testing-library/user-event";
 import ForecastPanel, { ForecastTooltip } from "./ForecastPanel";
 import { fetchForecast, parseForecast } from "../services/forecast";
@@ -84,11 +85,11 @@ describe("forecast presentation", () => {
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("row")).toHaveLength(25);
     expect(
-      within(table).getByRole("columnheader", { name: "Temperature (°C)" }),
+      within(table).getByRole("columnheader", { name: "Temp. (°C)" }),
     ).toBeTruthy();
     expect(
       within(table).getByRole("columnheader", {
-        name: "Precipitation probability (%)",
+        name: "Precip. probability (%)",
       }),
     ).toBeTruthy();
     expect(within(table).getByText("Mon, Oct 26 · 12 AM")).toBeTruthy();
@@ -186,4 +187,37 @@ describe("forecast presentation", () => {
     );
     expect(screen.getByText("Unavailable")).toBeTruthy();
   });
+});
+
+it("keeps retry focus on the forecast heading and exposes the table without accessibility violations", async () => {
+  fetchMock
+    .mockRejectedValueOnce(new Error("Offline"))
+    .mockResolvedValueOnce(data());
+  render(<ForecastPanel location={MANILA} />);
+  const retry = await screen.findByRole("button", { name: "Retry forecasts" });
+  retry.focus();
+  await userEvent.keyboard("{Enter}");
+  await screen.findByText("Hourly temperature");
+  expect(document.activeElement).toBe(
+    screen.getByRole("heading", { name: "Looking ahead · Manila" }),
+  );
+  await userEvent.tab();
+  expect(document.activeElement).toBe(
+    screen.getByText("View all 24 hourly values as a table"),
+  );
+  await userEvent.keyboard("{Enter}");
+  expect(screen.getByRole("table")).toBeTruthy();
+  // Canvas-dependent contrast/visible-label checks run in the real browser instead.
+  const results = await axe.run(document.body, {
+    runOnly: {
+      type: "tag",
+      values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"],
+    },
+    rules: {
+      "color-contrast": { enabled: false },
+      "label-content-name-mismatch": { enabled: false },
+      region: { enabled: false },
+    },
+  });
+  expect(results.violations.map((v) => v.id)).toEqual([]);
 });
