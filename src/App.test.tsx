@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearWeatherCache } from "./services/weatherCache";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
@@ -24,9 +25,24 @@ const weather: CurrentWeather = {
   validAt: 1792929600000,
   fetchedAt: 1792930000000,
 };
+beforeEach(() => {
+  const entries = new Map<string, string>();
+  vi.spyOn(window, "localStorage", "get").mockReturnValue({
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      entries.set(key, value);
+    },
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+    key: vi.fn(),
+    length: 0,
+  });
+});
 afterEach(() => {
+  clearWeatherCache();
   cleanup();
   vi.resetAllMocks();
+  vi.restoreAllMocks();
 });
 
 describe("current-weather dashboard", () => {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { clearWeatherCache } from "../services/weatherCache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   act,
@@ -22,6 +23,7 @@ vi.mock("../services/forecast", async (importOriginal) => ({
 const fetchMock = vi.mocked(fetchForecast);
 const data = () => parseForecast(forecastFixture(), FORECAST_NOW);
 beforeEach(() => {
+  vi.spyOn(Date, "now").mockReturnValue(FORECAST_NOW);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
       return this instanceof HTMLDivElement
@@ -39,6 +41,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  clearWeatherCache();
   cleanup();
   vi.resetAllMocks();
   vi.unstubAllGlobals();

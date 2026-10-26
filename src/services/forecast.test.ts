@@ -4,7 +4,8 @@ import {
   formatForecastDate,
   formatForecastHour,
   manilaDateKey,
-  parseForecast,
+  parseForecast as parseForecastData,
+  selectForecastWindow,
 } from "./forecast";
 import {
   forecastFixture,
@@ -13,6 +14,8 @@ import {
 } from "../test/forecastFixture";
 import { MANILA } from "./locations";
 
+const parseForecast = (body: unknown, now: number) =>
+  selectForecastWindow(parseForecastData(body, now), now)!;
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -220,7 +223,7 @@ describe("forecast requests", () => {
       temperature_unit: "celsius",
       timezone: "Asia/Manila",
       timeformat: "unixtime",
-      forecast_days: "7",
+      forecast_days: "8",
     });
     expect(data.fetchedAt).toBe(FORECAST_NOW);
     expect(url.searchParams.has("current")).toBe(false);

@@ -6,7 +6,6 @@ import {
   Wind,
   Thermometer,
   MapPin,
-  Star,
   Clock3,
   Radio,
   Code2,
@@ -21,12 +20,13 @@ import {
   CircleHelp,
   RefreshCw,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { fetchCurrentWeather, formatManilaTime } from "./services/weather";
 import LocationSearch from "./components/LocationSearch";
 import { MANILA, locationDetails } from "./services/locations";
 import type { WeatherLocation } from "./services/locations";
-import type { CurrentWeather } from "./services/weather";
+import Favorites from "./components/Favorites";
+import { useWeatherResource } from "./hooks/useWeatherResource";
 import { describeWeather } from "./services/weatherCodes";
 import type { WeatherIcon } from "./services/weatherCodes";
 import type { LucideIcon } from "lucide-react";
@@ -72,37 +72,27 @@ function Metric({
   );
 }
 
-type WeatherState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "success"; data: CurrentWeather };
-
 function App() {
   const [location, setLocation] = useState<WeatherLocation>(MANILA);
-  const [state, setState] = useState<WeatherState>({ status: "loading" });
-  const weatherRequest = useRef<AbortController | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    weatherRequest.current = controller;
-    fetchCurrentWeather(location, controller.signal).then(
-      (data) => {
-        if (!controller.signal.aborted) setState({ status: "success", data });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Weather is unavailable. Please retry.",
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt, location]);
-  const data = state.status === "success" ? state.data : null;
+  const current = useWeatherResource(location, "current", fetchCurrentWeather);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [forecastBusy, setForecastBusy] = useState(true);
+  const data = current.data ?? null;
+  const state = {
+    status: data ? "success" : current.pending ? "loading" : "error",
+    message: current.error,
+  };
+  const selectLocation = (place: WeatherLocation) => {
+    if (
+      place.id === location.id &&
+      place.latitude === location.latitude &&
+      place.longitude === location.longitude
+    )
+      return;
+    current.cancel();
+    setForecastBusy(true);
+    setLocation(place);
+  };
   const condition = describeWeather(
     data?.weatherCode ?? null,
     data?.isDay ?? null,
@@ -154,22 +144,26 @@ function App() {
           </div>
         </div>
         <div className="search-row">
-          <LocationSearch
-            onSelect={(place) => {
-              if (
-                place.id === location.id &&
-                place.latitude === location.latitude &&
-                place.longitude === location.longitude
-              )
-                return;
-              weatherRequest.current?.abort();
-              setState({ status: "loading" });
-              setLocation(place);
-            }}
-          />
+          <LocationSearch onSelect={selectLocation} />
           <span className="unit">
             °C <span>/</span> Metric units
           </span>
+        </div>
+        <div className="refresh-toolbar">
+          <button
+            disabled={current.pending || forecastBusy}
+            onClick={() => {
+              if (current.pending || forecastBusy) return;
+              current.refresh();
+              setRefreshToken((value) => value + 1);
+            }}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            {current.pending || forecastBusy
+              ? "Updating weather…"
+              : "Refresh current weather and forecasts"}
+          </button>
+          <span>Refresh gets new data for {location.name}.</span>
         </div>
         <div className="dashboard-grid">
           <section className="current-card" aria-labelledby="current-title">
@@ -186,10 +180,23 @@ function App() {
                     : "UNAVAILABLE"}
               </span>
             </div>
-            <div
-              className="current-body"
-              aria-busy={state.status === "loading"}
-            >
+            {data && current.pending && (
+              <p className="current-update" role="status">
+                Updating current weather. Earlier readings remain visible.
+              </p>
+            )}
+            {data && current.error && (
+              <div className="current-update" role="status">
+                <p>
+                  Current weather refresh failed: {current.error} Displayed
+                  readings are from an earlier fetch.
+                </p>
+                <button className="retry-button" onClick={current.refresh}>
+                  Retry weather request
+                </button>
+              </div>
+            )}
+            <div className="current-body" aria-busy={current.pending}>
               <div className="current-content" role="status" aria-live="polite">
                 <p className="eyebrow" id="current-title">
                   CURRENT WEATHER
@@ -211,13 +218,7 @@ function App() {
                       on our end.
                     </h2>
                     <p>{state.message}</p>
-                    <button
-                      className="retry-button"
-                      onClick={() => {
-                        setState({ status: "loading" });
-                        setAttempt((value) => value + 1);
-                      }}
-                    >
+                    <button className="retry-button" onClick={current.refresh}>
                       <RefreshCw size={14} aria-hidden="true" /> Retry weather
                       request
                     </button>
@@ -288,28 +289,7 @@ function App() {
               )}
             </div>
           </section>
-          <aside className="favorites-card">
-            <div className="section-heading">
-              <h2>
-                <Star size={18} /> Your places
-              </h2>
-              <span className="tiny-badge">MILESTONE 5</span>
-            </div>
-            <div className="favorites-empty">
-              <span className="icon-tile">
-                <MapPin size={25} />
-              </span>
-              <h3>A home for your favorite skies.</h3>
-              <p>
-                Save the places you care about
-                <br />
-                and check back in a heartbeat.
-              </p>
-              <button disabled>
-                <Star size={15} /> Saved locations coming soon
-              </button>
-            </div>
-          </aside>
+          <Favorites location={location} onSelect={selectLocation} />
           <section
             className="conditions-card"
             aria-labelledby="conditions-title"
@@ -367,6 +347,8 @@ function App() {
           <ForecastPanel
             key={`${location.id}:${location.latitude}:${location.longitude}`}
             location={location}
+            refreshToken={refreshToken}
+            onBusyChange={setForecastBusy}
           />
         </Suspense>
         <section id="project" className="project-note">
@@ -377,11 +359,12 @@ function App() {
             <h2>Good things are on the horizon.</h2>
             <p>
               Current weather, hourly charts, and seven-day forecasts are
-              connected. Saved places are up next.
+              connected. Save your places and refresh their weather whenever you
+              need.
             </p>
           </div>
           <span className="progress-badge">
-            04 <span>/ 07 milestones</span>
+            05 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>

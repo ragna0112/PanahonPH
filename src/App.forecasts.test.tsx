@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
+import { clearWeatherCache } from "./services/weatherCache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
+import { FAVORITES_KEY, serializeFavorites } from "./services/favorites";
 import { fetchCurrentWeather } from "./services/weather";
 import { fetchForecast, parseForecast } from "./services/forecast";
 import { searchLocations } from "./services/geocoding";
@@ -43,6 +52,18 @@ const data = (high: number) => {
   return parseForecast(body, FORECAST_NOW);
 };
 beforeEach(() => {
+  const entries = new Map<string, string>();
+  vi.spyOn(window, "localStorage", "get").mockReturnValue({
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      entries.set(key, value);
+    },
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+    key: vi.fn(),
+    length: 0,
+  });
+  vi.spyOn(Date, "now").mockReturnValue(FORECAST_NOW);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
       return this instanceof HTMLDivElement
@@ -71,6 +92,7 @@ beforeEach(() => {
   vi.mocked(searchLocations).mockResolvedValue(places);
 });
 afterEach(() => {
+  clearWeatherCache();
   cleanup();
   vi.resetAllMocks();
   vi.unstubAllGlobals();
@@ -154,5 +176,95 @@ describe("forecast requests alongside current weather", () => {
     });
     expect(screen.queryByText("Cancelled")).toBeNull();
     expect(screen.getAllByText("36°C")).toHaveLength(7);
+  });
+  it("manual refresh bypasses cache, retains readings, deduplicates clicks and preserves current data on partial failure", async () => {
+    let failCurrent!: (error: Error) => void;
+    let finishForecast!: (forecast: Forecast) => void;
+    forecastFetch.mockResolvedValueOnce(data(32)).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishForecast = resolve;
+        }),
+    );
+    render(<App />);
+    await screen.findByText("Seven-day forecast");
+    const button = await screen.findByRole("button", {
+      name: "Refresh current weather and forecasts",
+    });
+    currentFetch.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failCurrent = reject;
+        }),
+    );
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(currentFetch).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("30.2°C")).toBeTruthy();
+    expect(screen.getAllByText("32°C")).toHaveLength(7);
+    await waitFor(() => expect(forecastFetch).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      failCurrent(new Error("offline"));
+      finishForecast({ ...data(37), fetchedAt: FORECAST_NOW + 60_000 });
+    });
+    expect(screen.getByText(/Current weather refresh failed:/)).toBeTruthy();
+    expect(screen.getByText("30.2°C")).toBeTruthy();
+    expect(screen.getAllByText("37°C")).toHaveLength(7);
+    expect(screen.getByText(/Fetched by this app:/).textContent).toContain(
+      "11:35:00 PM",
+    );
+    expect(
+      screen.getByText(/Forecast fetched by this app:/).textContent,
+    ).toContain("11:36:00 PM");
+  });
+  it("keeps forecasts when refresh fails but updates successful current weather", async () => {
+    forecastFetch
+      .mockResolvedValueOnce(data(32))
+      .mockRejectedValueOnce(new Error("forecast offline"));
+    render(<App />);
+    await screen.findByText("Seven-day forecast");
+    currentFetch.mockResolvedValueOnce({
+      temperature: 31.3,
+      feelsLike: 35,
+      humidity: 70,
+      windSpeed: 5,
+      weatherCode: 3,
+      isDay: true,
+      validAt: FORECAST_NOW,
+      fetchedAt: FORECAST_NOW + 60_000,
+    });
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Refresh current weather and forecasts",
+      }),
+    );
+    expect(await screen.findByText("31.3°C")).toBeTruthy();
+    expect(await screen.findByText(/Forecast refresh failed:/)).toBeTruthy();
+    expect(screen.getAllByText("32°C")).toHaveLength(7);
+  });
+  it("selects favorites with both resources and reuses fresh cache when switching back", async () => {
+    window.localStorage.setItem(
+      FAVORITES_KEY,
+      serializeFavorites([MANILA, places[1]]),
+    );
+    forecastFetch.mockResolvedValue(data(32));
+    render(<App />);
+    await screen.findByText("Seven-day forecast");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Select San Jose, Camarines Sur, Philippines",
+      }),
+    );
+    await waitFor(() => expect(forecastFetch).toHaveBeenCalledTimes(2));
+    expect(currentFetch.mock.calls[1][0]).toEqual(places[1]);
+    expect(forecastFetch.mock.calls[1][0]).toEqual(places[1]);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Select Manila, Metro Manila, Philippines",
+      }),
+    );
+    await screen.findByText("Seven-day forecast");
+    expect(currentFetch).toHaveBeenCalledTimes(2);
+    expect(forecastFetch).toHaveBeenCalledTimes(2);
   });
 });

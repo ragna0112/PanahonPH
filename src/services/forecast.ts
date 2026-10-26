@@ -163,46 +163,55 @@ export function parseForecast(body: unknown, fetchedAt: number): Forecast {
     "%",
     dailyTimes.length,
   );
-  // Philippine time is a whole-hour offset, so UTC hour-floor is also Manila's hour-floor.
-  const startHour = Math.floor(fetchedAt / HOUR) * HOUR;
-  const startDay = manilaDayStart(fetchedAt);
-  const hourly = hourlyTimes
-    .map((time, index) => ({
+  const hourly = hourlyTimes.map((time, index) => ({
+    time,
+    temperature: temperature[index],
+    precipitationProbability: probability[index],
+  }));
+  const daily = dailyTimes.map((time, index) => {
+    if (
+      highs[index] !== null &&
+      lows[index] !== null &&
+      highs[index] < lows[index]
+    )
+      throw invalid();
+    return {
       time,
-      temperature: temperature[index],
-      precipitationProbability: probability[index],
-    }))
-    .filter((point) => point.time >= startHour && point.time < startHour + DAY);
-  const daily = dailyTimes
-    .map((time, index) => {
-      if (
-        highs[index] !== null &&
-        lows[index] !== null &&
-        highs[index] < lows[index]
-      )
-        throw invalid();
-      return {
-        time,
-        weatherCode: codes[index],
-        high: highs[index],
-        low: lows[index],
-        precipitationProbabilityMax: maxProbability[index],
-      };
-    })
-    .filter(
-      (point) => point.time >= startDay && point.time < startDay + 7 * DAY,
+      weatherCode: codes[index],
+      high: highs[index],
+      low: lows[index],
+      precipitationProbabilityMax: maxProbability[index],
+    };
+  });
+  const forecast = { hourly, daily, fetchedAt };
+  if (!selectForecastWindow(forecast, fetchedAt))
+    throw new Error(
+      "The forecast does not cover the next 24 hours and seven days. Please retry for an up-to-date forecast.",
     );
+  return forecast;
+}
+
+// Keep the complete validated response in memory, and select the visible window separately.
+export function selectForecastWindow(
+  forecast: Forecast,
+  now: number,
+): Forecast | null {
+  const startHour = Math.floor(now / HOUR) * HOUR;
+  const startDay = manilaDayStart(now);
+  const hourly = forecast.hourly.filter(
+    (point) => point.time >= startHour && point.time < startHour + DAY,
+  );
+  const daily = forecast.daily.filter(
+    (point) => point.time >= startDay && point.time < startDay + 7 * DAY,
+  );
   if (
     hourly.length !== 24 ||
     hourly[0].time !== startHour ||
     daily.length !== 7 ||
     daily[0].time !== startDay
-  ) {
-    throw new Error(
-      "The forecast does not cover the next 24 hours and seven days. Please retry for an up-to-date forecast.",
-    );
-  }
-  return { hourly, daily, fetchedAt };
+  )
+    return null;
+  return { hourly, daily, fetchedAt: forecast.fetchedAt };
 }
 
 export async function fetchForecast(
@@ -217,7 +226,7 @@ export async function fetchForecast(
     temperature_unit: "celsius",
     timezone: "Asia/Manila",
     timeformat: "unixtime",
-    forecast_days: "7",
+    forecast_days: "8",
   });
   const timeout = AbortSignal.timeout(15_000);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;

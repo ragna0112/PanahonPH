@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { CalendarDays, RefreshCw, TrendingUp } from "lucide-react";
 import {
   CartesianGrid,
@@ -13,17 +13,16 @@ import {
   fetchForecast,
   formatForecastDate,
   formatForecastHour,
+  selectForecastWindow,
 } from "../services/forecast";
 import type { Forecast } from "../services/forecast";
 import type { WeatherLocation } from "../services/locations";
 import { formatManilaTime } from "../services/weather";
 import { describeWeather } from "../services/weatherCodes";
+import { useWeatherResource } from "../hooks/useWeatherResource";
+import { useForecastClock } from "../hooks/useForecastClock";
 import WeatherSymbol from "./WeatherSymbol";
 
-type ForecastState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "success"; data: Forecast };
 const reading = (value: number | null, unit: string) =>
   value === null
     ? "Unavailable"
@@ -84,37 +83,63 @@ function HourTick({
 
 export default function ForecastPanel({
   location,
+  refreshToken = 0,
+  onBusyChange,
 }: {
   location: WeatherLocation;
+  refreshToken?: number;
+  onBusyChange?: (busy: boolean) => void;
 }) {
-  const [state, setState] = useState<ForecastState>({ status: "loading" });
-  const [attempt, setAttempt] = useState(0);
+  const {
+    data: rawData,
+    pending,
+    error,
+    refresh,
+  } = useWeatherResource(location, "forecast", fetchForecast);
+  const now = useForecastClock();
+  const window = useMemo(
+    () => (rawData ? selectForecastWindow(rawData, now) : null),
+    [rawData, now],
+  );
+  const state = {
+    status: window ? "success" : pending ? "loading" : "error",
+    data: window as Forecast,
+    message:
+      error ??
+      "Earlier forecast data no longer covers the required window. Please retry.",
+  };
   const syncId = useId();
+  const lastRefresh = useRef(refreshToken);
+  const lastAutomaticHour = useRef<number | null>(null);
   useEffect(() => {
-    const controller = new AbortController();
-    fetchForecast(location, controller.signal).then(
-      (data) => {
-        if (!controller.signal.aborted) setState({ status: "success", data });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: "error",
-            message:
-              error instanceof Error
-                ? error.message
-                : "Forecasts are unavailable. Please retry.",
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [location, attempt]);
+    onBusyChange?.(pending);
+  }, [onBusyChange, pending]);
+  useEffect(() => {
+    if (lastRefresh.current !== refreshToken) {
+      lastRefresh.current = refreshToken;
+      refresh();
+    }
+  }, [refreshToken, refresh]);
+  useEffect(() => {
+    const hour = Math.floor(now / 3_600_000);
+    if (pending && rawData && !window) lastAutomaticHour.current = hour;
+    if (
+      rawData &&
+      !window &&
+      !pending &&
+      !error &&
+      lastAutomaticHour.current !== hour
+    ) {
+      lastAutomaticHour.current = hour;
+      refresh();
+    }
+  }, [now, rawData, pending, error, refresh, window]);
 
   return (
     <section
       className="forecasts"
       aria-labelledby="forecast-title"
-      aria-busy={state.status === "loading"}
+      aria-busy={pending}
     >
       <div className="section-heading">
         <h2 id="forecast-title">
@@ -123,6 +148,31 @@ export default function ForecastPanel({
         </h2>
         <span>Asia/Manila</span>
       </div>
+      {rawData && pending && (
+        <p className="forecast-refresh-status" role="status">
+          Updating forecasts. Earlier readings remain visible when they cover
+          the current window.
+        </p>
+      )}
+      {rawData && error && (
+        <div className="forecast-refresh-status" role="status">
+          <p>
+            Forecast refresh failed: {error}{" "}
+            {window
+              ? "Displayed readings are from an earlier fetch."
+              : "Earlier forecast data no longer covers the required window; charts and cards are unavailable."}
+          </p>
+          <p>
+            Earlier forecast fetched: {formatManilaTime(rawData.fetchedAt)} ·
+            Asia/Manila
+          </p>
+          {window && (
+            <button className="search-retry" onClick={refresh}>
+              Retry forecasts
+            </button>
+          )}
+        </div>
+      )}
       {state.status !== "success" ? (
         <div className="forecast-message" role="status" aria-live="polite">
           <TrendingUp size={28} aria-hidden="true" />
@@ -134,13 +184,7 @@ export default function ForecastPanel({
           {state.status === "error" && (
             <>
               <p>{state.message}</p>
-              <button
-                className="search-retry"
-                onClick={() => {
-                  setState({ status: "loading" });
-                  setAttempt((value) => value + 1);
-                }}
-              >
+              <button className="search-retry" onClick={refresh}>
                 <RefreshCw size={14} aria-hidden="true" /> Retry forecasts
               </button>
             </>
@@ -153,7 +197,7 @@ export default function ForecastPanel({
       ) : (
         <>
           <p className="forecast-intro">
-            Next 24 hourly points, starting at the current hour when fetched.{" "}
+            Next 24 hourly points, starting at the current Manila hour.{" "}
             {formatForecastDate(state.data.hourly[0].time)} ·{" "}
             {formatForecastHour(state.data.hourly[0].time)} to{" "}
             {formatForecastDate(state.data.hourly[23].time)} ·{" "}
@@ -297,7 +341,7 @@ export default function ForecastPanel({
           <div className="daily-heading">
             <h3>Seven-day forecast</h3>
             <p>
-              Starting today at fetch time. Daily high/low temperatures, most
+              Starting today in Asia/Manila. Daily high/low temperatures, most
               severe condition, and maximum hourly precipitation probability for
               each day.
             </p>
