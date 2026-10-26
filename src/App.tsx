@@ -382,7 +382,7 @@ function App() {
             </p>
           </div>
           <span className="progress-badge">
-            06 <span>/ 07 milestones</span>
+            07 <span>/ 07 milestones</span>
           </span>
         </section>
       </main>
